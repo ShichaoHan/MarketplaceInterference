@@ -1,5 +1,8 @@
 import pandas as pd 
 import numpy as np 
+import tensorflow as tf
+import subprocess
+import time
 
 def logistic_row(row):
     return np.exp(row) / np.sum(np.exp(row))
@@ -41,7 +44,7 @@ def DGP_new_heterogeneous(J, Q, K, promo_ratio, query_matrix, X_goodbads, X_util
 
 def crossfitted_estimate_var(hfuncs_each_fold, debias_terms_each_fold):
     undebias_point = np.mean([np.mean(hfuncs_each_fold[f]) for f in hfuncs_each_fold])
-    undebias_var = np.mean([np.mean((hfuncs_each_fold[f] - undebias_point) ** 2) for h in hfuncs_each_fold])
+    undebias_var = np.mean([np.mean((hfuncs_each_fold[f] - undebias_point) ** 2) for f in hfuncs_each_fold])
     debias_point = np.mean([np.mean(hfuncs_each_fold[f] - debias_terms_each_fold[f]) for f in hfuncs_each_fold])
     debias_var = np.mean([np.mean((hfuncs_each_fold[f] - debias_terms_each_fold[f] - undebias_point) ** 2) for f in hfuncs_each_fold])
     return debias_point, debias_var, undebias_point, undebias_var
@@ -54,7 +57,7 @@ def is_invertible(matrix):
 def permute_treatment_dict(J, L):
     perm_dict = {}
     for j in range(J):
-        perm_dict[j] = np.random.choice(L+1, 1)
+        perm_dict[j] = np.random.choice(L+1)
     return perm_dict
 
 ## Helper function for cross validation
@@ -146,7 +149,7 @@ def compute_loss_gradient(predict_p, exposure_matrix, treatment_matrix, predict_
     dl1dtheta0 = predict_p - exposure_matrix
     dl1dtheta0 = dl1dtheta0[:, 1:] 
     dl1dtheta1 = treatment_matrix * (predict_p - exposure_matrix)
-    dl2dmu = exposure_matrix * (predict_outcome - observed_outcome)
+    dl2dmu = exposure_matrix * (predict_outcome - observed_outcome[:, np.newaxis])
     gradient_vector_l = np.concatenate([dl1dtheta0, dl1dtheta1, dl2dmu], axis =1)
     return gradient_vector_l
 
@@ -160,8 +163,8 @@ def compute_value_gradient(predict_p_treat, predict_outcome_treat, predict_p_con
     gradient_vector_H = np.concatenate([dHdtheta0, dHdtheta1, dHdmu], axis =1 )
     return gradient_vector_H
 
-def compute_hessian_instance(W_matrix_m, exposure_matrix, predict_p_m):
-    f_size = len(W_matrix_m)
+def compute_hessian_instance(W_matrix_m, exposure_matrix, predict_p_m, L):
+    f_size, K = W_matrix_m.shape
     predict_p_1minusp_m = predict_p_m * (1 - predict_p_m)
     W_p_1minusp_m = W_matrix_m * predict_p_1minusp_m
 
