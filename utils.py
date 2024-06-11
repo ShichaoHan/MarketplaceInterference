@@ -46,7 +46,7 @@ def crossfitted_estimate_var(hfuncs_each_fold, debias_terms_each_fold):
     undebias_point = np.mean([np.mean(hfuncs_each_fold[f]) for f in hfuncs_each_fold])
     undebias_var = np.mean([np.mean((hfuncs_each_fold[f] - undebias_point) ** 2) for f in hfuncs_each_fold])
     debias_point = np.mean([np.mean(hfuncs_each_fold[f] - debias_terms_each_fold[f]) for f in hfuncs_each_fold])
-    debias_var = np.mean([np.mean((hfuncs_each_fold[f] - debias_terms_each_fold[f] - undebias_point) ** 2) for f in hfuncs_each_fold])
+    debias_var = np.mean([np.mean((hfuncs_each_fold[f] - debias_terms_each_fold[f] - debias_point) ** 2) for f in hfuncs_each_fold])
     return debias_point, debias_var, undebias_point, undebias_var
 
 
@@ -163,46 +163,38 @@ def compute_value_gradient(predict_p_treat, predict_outcome_treat, predict_p_con
     gradient_vector_H = np.concatenate([dHdtheta0, dHdtheta1, dHdmu], axis =1 )
     return gradient_vector_H
 
-def compute_hessian_instance(W_matrix_m, exposure_matrix, predict_p_m, L):
+def compute_hessian_instance(W_matrix_m, predict_p_m):
     f_size, K = W_matrix_m.shape
     predict_p_1minusp_m = predict_p_m * (1 - predict_p_m)
     W_p_1minusp_m = W_matrix_m * predict_p_1minusp_m
 
     ## Off-diagonal terms 
     p_outer_p = np.array([np.outer(row_, row_) for row_ in predict_p_m])
-    d2l2dtheta1 =  np.array([np.outer(row_, row_) for row_ in W_matrix_m]) * p_outer_p
+    d2l2dtheta1 =  - np.array([np.outer(row_, row_) for row_ in W_matrix_m]) * p_outer_p
     ## Modify diagonal terms
     for i in range(f_size):
         np.fill_diagonal(d2l2dtheta1[i], W_p_1minusp_m[i])
-    
-    d2l2dtheta0 = - np.array([np.outer(row_, row_) for row_ in predict_p_m])
 
-    ## FIX: iterate over all l1, l2 
-    d2ldthetal1dthetal2 = {} 
-    for l in range(L):
-        d2l2dtheta0dtheta1 = - W_matrix_m[:, np.newaxis, :] * p_outer_p
-        for i in range(f_size):
-            np.fill_diagonal(d2l2dtheta0dtheta1[i], W_p_1minusp_m[i])
-        ## NOTE: -1 to indicate the baseline theta 
-        d2ldthetal1dthetal2[(-1,l)] = d2l2dtheta0dtheta1[:,1:,:]
-        d2ldthetal1dthetal2[(l,-1)] = np.transpose(d2l2dtheta0dtheta1[:,1:,:], (0,2,1))
-        d2ldthetal1dthetal2[(l,l)] = d2l2dtheta1
+    d2l2dtheta0dtheta1 = - W_matrix_m[:, np.newaxis, :] * p_outer_p
+    for i in range(f_size):
+        np.fill_diagonal(d2l2dtheta0dtheta1[i], W_p_1minusp_m[i])
+    ## NOTE: -1 to indicate the baseline theta 
+    d2ldtheta0dtheta1 = d2l2dtheta0dtheta1[:,1:,:]
+    d2ldtheta1dtheta0 = np.transpose(d2ldtheta0dtheta1, (0,2,1))
 
+    d2l2dtheta0 = - p_outer_p
     d2l2dmu = np.zeros(d2l2dtheta1.shape)
     for i in range(d2l2dmu.shape[0]):
         np.fill_diagonal(d2l2dtheta0[i], predict_p_1minusp_m[i, :])
         np.fill_diagonal(d2l2dmu[i], predict_p_m[i,:])
 
     d2l2dtheta0 = d2l2dtheta0[:,1:, 1:]
-    Hessian_first_row = np.concatenate([d2l2dtheta0] + [d2ldthetal1dthetal2[(-1, l)] for l in range(L)] + [np.zeros((f_size, K-1, K))], axis=2)
+    Hessian_first_row = np.concatenate([d2l2dtheta0] + [d2ldtheta0dtheta1] + [np.zeros((f_size, K-1, K))], axis=2)
 
     ## 1 to L + 1 row 
-    Hessian_middle_dict = {}
-    for l in range(L):
-        row_l = np.concatenate([d2ldthetal1dthetal2[(l, -1)]] + [d2ldthetal1dthetal2[(l, l_prime)] for l_prime in range(L)] +[np.zeros((f_size, K, K))], axis=2)
-        Hessian_middle_dict[l] = row_l                                                                           
+    Hessian_middle_row = np.concatenate([d2ldtheta1dtheta0] + [d2l2dtheta1] +[np.zeros((f_size, K, K))], axis=2)                                                                     
 
-    Hessian_third_row = np.concatenate((np.zeros((f_size, K, K  * (L + 1 ) - 1 )), d2l2dmu), axis =2)
-    Hessian = np.concatenate([Hessian_first_row] + [Hessian_middle_dict[l] for l in range(L)] + [Hessian_third_row], axis = 1 )
+    Hessian_third_row = np.concatenate((np.zeros((f_size, K, K  * 2 - 1 )), d2l2dmu), axis =2)
+    Hessian = np.concatenate([Hessian_first_row] + [Hessian_middle_row] + [Hessian_third_row], axis = 1 )
     
     return Hessian
