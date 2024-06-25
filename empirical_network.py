@@ -115,3 +115,15 @@ def custom_loss(y_true, y_pred):
     
     
     
+
+
+def compute_value_gradient_subgroup(predict_p_treat, predict_outcome_treat, predict_p_control, predict_outcome_control, J):
+    # J: dimension K, indicator function of whether item k belongs to the subgroup
+    Ey1 = np.sum(predict_p_treat * predict_outcome_treat * J, axis=1, keepdims=True)
+    Ey0 = np.sum(predict_p_control * predict_outcome_control * J, axis=1, keepdims=True)
+    dHdtheta0 = predict_p_treat * (predict_outcome_treat * J - Ey1) - predict_p_control * (predict_outcome_control * J - Ey0)
+    dHdtheta0 = dHdtheta0[:, 1:]
+    dHdtheta1 = predict_p_treat * (predict_outcome_treat * J - Ey1) 
+    dHdmu = (predict_p_treat - predict_p_control) * J
+    gradient_vector_H = np.concatenate([dHdtheta0, dHdtheta1, dHdmu], axis =1 )
+    return gradient_vector_H
