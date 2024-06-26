@@ -97,7 +97,7 @@ def get_ground_truth(promo_ratio, item_embeddings, item_promotion, user_embeddin
 
 
 def DGP_new_heterogeneous_embeddings(promo_ratio, item_embeddings, item_promotion, user_embeddings,
-                                     query_matrix, treated_probability=0.5):
+                                     query_matrix, treated_probability=0.5, noise_std=0.1):
     Q, K = query_matrix.shape
     J = len(item_embeddings)
     utility = user_embeddings @ (item_embeddings.T)
@@ -129,7 +129,7 @@ def DGP_new_heterogeneous_embeddings(promo_ratio, item_embeddings, item_promotio
     
     ## Outcome model  
     ## First: a true outcome model of Exponential 
-    outcome_potential = baseline_score + 0.1 *  outcome_noise
+    outcome_potential = baseline_score + noise_std *  outcome_noise
 
     return promotions, embeddings, W_matrix, outcome_potential, exposure_matrix
 

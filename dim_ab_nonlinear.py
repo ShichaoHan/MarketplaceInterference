@@ -53,6 +53,11 @@ parser.add_argument(
     default=100,
     help='number of simulations')
 parser.add_argument(
+    '--noise_std',
+    type=float,
+    default=0.1,
+    help='outcome noise std')
+parser.add_argument(
     '--epochs',
     type=int,
     default=500,
@@ -66,6 +71,7 @@ J = args.J
 K = args.K
 Q = args.Q 
 epochs = args.epochs
+noise_std = args.noise_std
 uplift_factor = args.uplift_factor
 L = 1
 d = 2
@@ -101,7 +107,7 @@ def exp(s):
     (promotions, embeddings, W_matrix, outcome_potential, 
      exposure_matrix) = DGP_new_heterogeneous_embeddings(uplift_factor, item_embeddings, 
                                                          item_promotion, user_embeddings, 
-                                                         query_matrix, treated_probability=0.5)
+                                                         query_matrix, treated_probability=0.5, noise_std=noise_std)
     observed_outcome = np.sum(outcome_potential * exposure_matrix, axis = 1 )
     observed_queries_treatment = np.sum(exposure_matrix * W_matrix, axis = 1 )
     T = observed_outcome[observed_queries_treatment == 1]
