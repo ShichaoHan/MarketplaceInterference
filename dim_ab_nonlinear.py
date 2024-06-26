@@ -24,7 +24,7 @@ parser.add_argument(
 parser.add_argument(
     '--K',
     type=int,
-    default=5,
+    default=3,
     help='size of consideration set')
 parser.add_argument(
     '--Q',
@@ -57,12 +57,6 @@ parser.add_argument(
     type=int,
     default=500,
     help='number of simulations')
-parser.add_argument(
-    '-m',
-    '--model_name',
-    type=str,
-    default='oracle',
-    help='model name')
 
 args = parser.parse_args()
 
@@ -76,13 +70,12 @@ uplift_factor = args.uplift_factor
 L = 1
 d = 2
 
-np.random.seed(int(time.time() * 1e8 % 1e8))
+np.random.seed(0)
 
 item_embeddings = np.random.uniform(size=(J, d))
 item_promotion = np.random.choice([1, 0], size=J)
-true_estimate, true_stderr = get_ground_truth(Q * 1000, K, uplift_factor, item_embeddings, item_promotion)
 
-
+np.random.seed(int(time.time() * 1e8 % 1e8))
 
 L = 1
 
@@ -95,16 +88,29 @@ n_folds = args.n_folds
 
 begin_time = time.time()
 
-def exp(s, model_name):
-    (query_matrix, promotions, embeddings, W_matrix, outcome_potential, exposure_matrix) = DGP_new_heterogeneous_embeddings(Q, K, uplift_factor, item_embeddings, item_promotion, treated_probability=0.5)
+def exp(s):
+    user_embeddings = np.random.uniform(size=(Q, d))
+    query_matrix = []
+    for each_query in range(Q):
+        selected_indices = np.random.choice(np.arange(J), size = K, replace= False)
+        query_matrix += [selected_indices]
+    query_matrix = np.array(query_matrix)
+    true_estimate, true_stderr = get_ground_truth(uplift_factor, item_embeddings, 
+                                                  item_promotion, user_embeddings, query_matrix)
+    
+    (promotions, embeddings, W_matrix, outcome_potential, 
+     exposure_matrix) = DGP_new_heterogeneous_embeddings(uplift_factor, item_embeddings, 
+                                                         item_promotion, user_embeddings, 
+                                                         query_matrix, treated_probability=0.5)
     observed_outcome = np.sum(outcome_potential * exposure_matrix, axis = 1 )
     observed_queries_treatment = np.sum(exposure_matrix * W_matrix, axis = 1 )
-    T, C = observed_outcome[observed_queries_treatment == 1] , observed_outcome[observed_queries_treatment == 0]  
+    T = observed_outcome[observed_queries_treatment == 1]
+    C = observed_outcome[observed_queries_treatment == 0] 
     dim_point, dim_var = dim_est(T, C, 0.5, Q)
-
+        
     
     ## Cross-fitting indices 
-    all_inds = generate_indices(np.array(query_matrix).shape[0], n_folds)
+    all_inds = generate_indices(Q, n_folds)
 
     ## Iterate over each fold for cross-validation. 
     hfuncs_each_fold,  debias_terms_each_fold = {}, {}
@@ -197,9 +203,6 @@ def exp(s, model_name):
     result_df.to_csv(path)
 
 for s in range(args.n_sims):
-    exp(s, args.model_name)
-    
-
-# Parallel(n_jobs=-1, verbose=5)(delayed(exp)(s, args.model_name) for s in range(args.n_sims))
+    exp(s)
 
 print(f"Finished in {time.time() - begin_time} seconds.")
