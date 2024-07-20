@@ -202,7 +202,7 @@ def exp(s):
     result_df = pd.DataFrame({"debias_point": [debias_point], "debias_var":[debias_var], "dim": [dim_point], 
                               "dim_var":[dim_var], "undebias_point": [undebias_point], "undebias_var": [undebias_var], 
                               "J" : [J], "Q": [Q],  "K":[K],  "M": [M], "epochs" :[epochs], "n_folds": [n_folds], "uplift_factor": [uplift_factor],
-                              "truth": [true_estimate], "truth_stderr": [true_stderr] })
+                              "truth": [true_estimate], "truth_stderr": [true_stderr], "noise_std": [noise_std] })
     # result_df.to_csv(path)
     print("finish simulation.")
 
